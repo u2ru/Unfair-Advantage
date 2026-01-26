@@ -1,3 +1,5 @@
+using System;
+using System.Collections;
 using System.Security.Authentication.ExtendedProtection;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -5,28 +7,37 @@ using UnityEngine.SceneManagement;
 public class Player : MonoBehaviour
 {
     // Camera Rotation
-    public float mouseSensitivity = 2f;
+    private float mouseSensitivity = 2f;
     private float verticalRotation = 0f;
     private Transform cameraTransform;
 
     // Ground Movement
     private Rigidbody rb;
-    public float MoveSpeed = 5f;
+    private float MoveSpeed = 10f;
     private float moveHorizontal;
     private float moveForward;
 
     private float playerYPosition;
 
     // Jumping
-    public float jumpForce = 10f;
-    public float fallMultiplier = 2.5f; // Multiplies gravity when falling down
-    public float ascendMultiplier = 2f; // Multiplies gravity for ascending to peak of jump
+    private float jumpForce = 10f;
+    private float fallMultiplier = 2.5f; // Multiplies gravity when falling down
+    private float ascendMultiplier = 2f; // Multiplies gravity for ascending to peak of jump
     private bool isGrounded = true;
-    public LayerMask groundLayer;
+    public LayerMask groundLayer = ~0; // default to all layers; set in Inspector if needed
     private float groundCheckTimer = 0f;
     private float groundCheckDelay = 0.3f;
     private float playerHeight;
     private float raycastDistance;
+
+    // texts
+    public GameObject winText;
+    public GameObject loseText;
+
+    private float endScreenDelay = 2f; // seconds to show win/lose text before continuing
+
+    // Input control
+    private bool acceptInput = true;
 
     void Start()
     {
@@ -41,18 +52,30 @@ public class Player : MonoBehaviour
         // Hides the mouse
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+
+        if (winText != null) winText.SetActive(false);
+        if (loseText != null) loseText.SetActive(false);
     }
 
     void Update()
     {
-        moveHorizontal = Input.GetAxisRaw("Horizontal");
-        moveForward = Input.GetAxisRaw("Vertical");
-
-        RotateCamera();
-
-        if (Input.GetButtonDown("Jump") && isGrounded)
+        if (acceptInput)
         {
-            Jump();
+            moveHorizontal = Input.GetAxisRaw("Horizontal");
+            moveForward = Input.GetAxisRaw("Vertical");
+
+            RotateCamera();
+
+            if (Input.GetButtonDown("Jump") && isGrounded)
+            {
+                Jump();
+            }
+        }
+        else
+        {
+            // ensure no residual movement input when input is disabled
+            moveHorizontal = 0f;
+            moveForward = 0f;
         }
 
         // Checking when we're on the ground and keeping track of our ground check delay
@@ -75,13 +98,12 @@ public class Player : MonoBehaviour
 
         if (rb.position.y < -10f)
         {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            StartCoroutine(ShowThenContinue(loseText, null));
         }
     }
 
     void MovePlayer()
     {
-
         Vector3 movement = (transform.right * moveHorizontal + transform.forward * moveForward).normalized;
         Vector3 targetVelocity = movement * MoveSpeed;
 
@@ -128,5 +150,65 @@ public class Player : MonoBehaviour
             // Rising: Change multiplier to make player reach peak of jump faster
             rb.velocity += Vector3.up * Physics.gravity.y * ascendMultiplier * Time.fixedDeltaTime;
         }
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("damage"))
+        {
+            // show lose text then restart (default continuation)
+            StartCoroutine(ShowThenContinue(loseText, null));
+        }
+
+        if (collision.gameObject.CompareTag("Finish"))
+        {
+            // show win text then go to next level (custom continuation)
+            StartCoroutine(ShowThenContinue(winText, NextLevel));
+        }
+    }
+
+    // Shows the provided UI element, waits, then executes continuation if provided.
+    // If continuation is null, defaults to reloading the current scene.
+    private IEnumerator ShowThenContinue(GameObject text, Action continuation)
+    {
+        // stop processing further player inputs immediately
+        DisableInput();
+
+        if (text != null)
+            text.SetActive(true);
+
+        yield return new WaitForSeconds(endScreenDelay);
+
+        if (continuation != null)
+            continuation();
+        else
+            RestartScene();
+    }
+
+    private void RestartScene()
+    {
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    private void NextLevel()
+    {
+        int next = SceneManager.GetActiveScene().buildIndex + 1;
+        if (next < SceneManager.sceneCountInBuildSettings)
+            SceneManager.LoadScene(next);
+        else
+            RestartScene(); // fallback
+    }
+
+    // Public API to disable/enable player input handling (movement, camera, jump)
+    public void DisableInput()
+    {
+        acceptInput = false;
+        moveHorizontal = 0f;
+        moveForward = 0f;
+    }
+
+    public void EnableInput()
+    {
+        acceptInput = true;
     }
 }
