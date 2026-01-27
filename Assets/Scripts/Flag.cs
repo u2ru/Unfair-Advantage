@@ -20,6 +20,11 @@ public class Flag : MonoBehaviour
 
     void FixedUpdate()
     {
+        // if level is not 1, do nothing
+        if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex != 1)
+        {
+            return;
+        }
         // check if 'Player' is within 3 units of the flag
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)

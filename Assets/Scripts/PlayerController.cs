@@ -193,10 +193,10 @@ public class Player : MonoBehaviour
     private void NextLevel()
     {
         int next = SceneManager.GetActiveScene().buildIndex + 1;
-        if (next < SceneManager.sceneCountInBuildSettings)
+        if (next < SceneManager.sceneCountInBuildSettings - 1)
             SceneManager.LoadScene(next);
         else
-            RestartScene(); // fallback
+            SceneManager.LoadScene(0); // go back to main menu if no more levels
     }
 
     // Public API to disable/enable player input handling (movement, camera, jump)
